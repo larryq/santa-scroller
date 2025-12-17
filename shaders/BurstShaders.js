@@ -3,6 +3,7 @@ export const vertexShader = `
   uniform float time;
   uniform float duration;
   uniform vec3 explosionColor;
+  uniform bool isShotOrExploding;
   
   attribute float size;
   attribute vec3 velocity; // Unique velocity vector for each particle
@@ -23,7 +24,11 @@ export const vertexShader = `
     vec4 mvPosition = modelViewMatrix * vec4(animatedPosition, 1.0);
 
     // Particle size, scaled by progress
-    gl_PointSize = size * (1.0 - progress) * (500.0 / -mvPosition.z);
+    if(isShotOrExploding) { // this is a shot
+         gl_PointSize = size;
+    } else { // this is an explosion                
+         gl_PointSize = size * (1.0 - progress) * (500.0 / -mvPosition.z);
+    } 
 
     // Fade opacity as it expands
     vOpacity = 1.0 - progress;

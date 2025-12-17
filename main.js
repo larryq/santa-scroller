@@ -26,6 +26,9 @@ import {
   initializeClassGlobals,
   PlasmaBurst,
   Scout,
+  House,
+  PresentSparkle,
+  DeliveryPopup,
 } from "./GameClasses.js";
 
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -50,6 +53,9 @@ let projectiles = [];
 let enemies = [];
 let bursts = [];
 let powerups = [];
+let houses = [];
+let presentSparkles = [];
+let deliveryPopups = [];
 
 // --- Utility Functions ---
 
@@ -70,8 +76,8 @@ function initThree() {
   camera = new THREE.PerspectiveCamera(
     75,
     CANVAS_WIDTH / CANVAS_HEIGHT,
-    0.1,
-    1000
+    0.01,
+    5000
   );
   camera.position.set(0, 0, 40);
   camera.rotation.set(0, 0, 0);
@@ -297,6 +303,19 @@ function spawnPowerUp() {
   powerups.push(new PowerUp(x, y, type, updateUI));
 }
 
+function spawnInitialHouses() {
+  houses.forEach((h) => h.remove());
+  houses = [];
+
+  const startX = -BOUNDARY_X;
+  const endX = BOUNDARY_X * 3; // extend far to the right
+  const spacing = 20; // distance between houses
+
+  for (let x = startX; x < endX; x += spacing) {
+    houses.push(new House(x, -BOUNDARY_Y + 3));
+  }
+}
+
 // --- Core Game Functions ---
 
 /**
@@ -332,6 +351,7 @@ function setupGame() {
 
   // Initialize global references in the classes after playerState is created
   initializeClassGlobals({ scene, playerMesh, game, playerState, bursts });
+  spawnInitialHouses();
 
   updateUI();
   addEventListeners();
@@ -441,10 +461,10 @@ function updateGame(deltaFactor) {
 
     const enemyChance = Math.random();
 
-    if (enemyChance < 0.6) {
+    if (enemyChance < 0.1) {
       // 60% chance for Chaser
       enemies.push(new Chaser(x, y, game));
-    } else if (enemyChance < 0.85) {
+    } else if (enemyChance < 0.6) {
       // 25% chance for Cruiser
       enemies.push(new Cruiser(x, y, game, CRUISER_DETONATE_X, Burst));
     } else {
@@ -469,6 +489,8 @@ function updateGame(deltaFactor) {
 
   enemies.forEach((e) => e.update(deltaFactor));
   powerups.forEach((p) => p.update(deltaFactor));
+  updateHouses(deltaFactor);
+  deliveryPopups.forEach((dp) => dp.update(deltaFactor, camera));
 
   // Filter out expired objects
   projectiles = projectiles.filter((p) => {
@@ -495,6 +517,8 @@ function updateGame(deltaFactor) {
     if (!shouldKeep && p.mesh) p.remove();
     return shouldKeep;
   });
+
+  presentSparkles = presentSparkles.filter((ps) => ps.update(deltaFactor));
 
   // --- 4. Collision Detection ---
 
@@ -561,6 +585,163 @@ function updateGame(deltaFactor) {
     });
     powerups = nextPowerups;
   }
+}
+
+function updateHouses(deltaFactor) {
+  houses.forEach((h) => h.update(deltaFactor));
+  houses.forEach((h) => {
+    if (h.mesh.position.x < -BOUNDARY_X - 20) {
+      // Move house to the far right to recycle it
+      h.mesh.position.x += BOUNDARY_X * 2 + 40;
+      h.hasReceivedPresent = false;
+    }
+  });
+  if (playerMesh) {
+    houses.forEach((h) => {
+      if (
+        !h.hasReceivedPresent &&
+        playerMesh.position.x > h.mesh.position.x - 2 &&
+        playerMesh.position.x < h.mesh.position.x + 2
+      ) {
+        dropPresentIntoHouse(h, deltaFactor);
+        h.hasReceivedPresent = true;
+      }
+    });
+  }
+}
+
+function dropPresentIntoHouse2(house, deltaFactor) {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshPhongMaterial({
+    color: 0xff0000,
+    emissive: 0xaa0000,
+  });
+
+  let wobbleTimer = 0;
+
+  const present = new THREE.Mesh(geometry, material);
+  present.position.copy(playerMesh.position);
+
+  scene.add(present);
+
+  // Animate falling
+  const fallSpeed = 2.5;
+
+  const fall = () => {
+    // wobble parameters
+    const wobbleSpeed = 3; // how fast it wiggles
+    const wobbleAmount = 0.1; // how wide the wobble is
+    wobbleTimer += 0.026;
+
+    // rotation wobble
+    present.rotation.z = Math.sin(wobbleTimer * wobbleSpeed) * 0.3;
+
+    // horizontal wobble
+    // present.position.x +=
+    //   Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount * wobbleTimer;
+
+    const baseX = present.position.x; // store once before fall()
+    present.position.x =
+      baseX + Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount;
+
+    if (!present.parent) return;
+
+    present.position.y -= 0.1;
+
+    presentSparkles.push(
+      new PresentSparkle(
+        present.position.x,
+        present.position.y,
+        present.position.z
+      )
+    );
+
+    if (present.position.y <= house.mesh.position.y + house.height / 2) {
+      scene.remove(present);
+      present.geometry.dispose();
+      present.material.dispose();
+      return;
+    }
+
+    requestAnimationFrame(fall);
+  };
+
+  fall();
+}
+
+function dropPresentIntoHouse(house, deltaFactor) {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshPhongMaterial({
+    color: 0xff0000,
+    emissive: 0xaa0000,
+  });
+
+  let wobbleTimer = 0;
+  let fallTimer = wobbleTimer;
+
+  const present = new THREE.Mesh(geometry, material);
+  present.position.copy(playerMesh.position);
+
+  scene.add(present);
+
+  // store the present's starting X
+  const baseX = present.position.x;
+
+  // IMPORTANT: match the house's actual scroll speed
+  const houseScrollSpeed = 5; // same number you use in house.update()
+
+  const fall = () => {
+    if (!present.parent) return;
+
+    // wobble
+    wobbleTimer += deltaFactor;
+    fallTimer += deltaFactor;
+
+    const wobbleSpeed = 8;
+    const wobbleAmount = 0.9;
+    const wobble = Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount;
+
+    // rotation wobble
+    present.rotation.z = wobble * 1.5;
+
+    // ✅ horizontal tracking: match house movement exactly
+    const scrollOffset = houseScrollSpeed * fallTimer;
+
+    // ✅ apply wobble relative to baseX
+    present.position.x = baseX - scrollOffset + wobble;
+
+    // vertical fall
+    present.position.y -= 5 * deltaFactor;
+
+    // sparkles
+    presentSparkles.push(
+      new PresentSparkle(
+        present.position.x,
+        present.position.y,
+        present.position.z
+      )
+    );
+
+    // landing
+    if (present.position.y <= house.mesh.position.y + house.height / 2) {
+      scene.remove(present);
+      present.geometry.dispose();
+      present.material.dispose();
+      deliveryPopups.push(
+        new DeliveryPopup(
+          house.mesh.position.x,
+          house.mesh.position.y + house.height + 1,
+          house.mesh.position.z,
+          camera
+        )
+      );
+      return;
+    }
+
+    requestAnimationFrame(fall);
+  };
+
+  fall();
 }
 
 /**
