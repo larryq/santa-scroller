@@ -12,24 +12,22 @@ import {
   BOUNDARY_Y,
   INITIAL_SHIELD_HP,
   PowerUpType,
-  SCOUT_SPEED,
 } from "./constants.js";
 
-import {
-  Game,
-  PlayerState,
-  Chaser,
-  Cruiser,
-  Projectile,
-  Burst,
-  PowerUp,
-  initializeClassGlobals,
-  PlasmaBurst,
-  Scout,
-  House,
-  PresentSparkle,
-  DeliveryPopup,
-} from "./GameClasses.js";
+import { initializeClassGlobals } from "./GameClasses.js";
+
+import { Game } from "./Game.js";
+import { PlayerState } from "./PlayerState.js";
+import { Chaser } from "./Chaser.js";
+import { Cruiser } from "./Cruiser.js";
+import { Scout } from "./Scout.js";
+import { Projectile } from "./Projectile.js";
+import { Burst } from "./Burst.js";
+import { PlasmaBurst } from "./PlasmaBurst.js";
+import { PowerUp } from "./PowerUp.js";
+import { House } from "./House.js";
+import { PresentSparkle } from "./PresentSparkle.js";
+import { DeliveryPopup } from "./DeliveryPopup.js";
 
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 // --- Three.js Globals (State) ---
@@ -241,7 +239,11 @@ function createPlayer() {
   playerState = new PlayerState(
     BURST_COOLDOWN_SECONDS,
     updateUI,
-    showMessageBox
+    showMessageBox,
+    playerMesh,
+    playerState,
+    scene,
+    game
   );
 }
 
@@ -254,7 +256,8 @@ function shoot() {
   const p1 = new Projectile(
     playerMesh.position.x,
     playerMesh.position.y,
-    playerMesh.position.z - 2
+    playerMesh.position.z - 2,
+    scene
   );
   projectiles.push(p1);
 
@@ -264,13 +267,15 @@ function shoot() {
     const p2 = new Projectile(
       playerMesh.position.x,
       playerMesh.position.y + 1,
-      playerMesh.position.z - 2
+      playerMesh.position.z - 2,
+      scene
     );
     // Projectile 3: Offset DOWN on the Y-axis
     const p3 = new Projectile(
       playerMesh.position.x,
       playerMesh.position.y - 1,
-      playerMesh.position.z - 2
+      playerMesh.position.z - 2,
+      scene
     );
     projectiles.push(p2, p3);
   }
@@ -284,7 +289,9 @@ function activateBurst() {
   const b = new PlasmaBurst(
     playerMesh.position.x,
     playerMesh.position.y,
-    playerMesh.position.z
+    playerMesh.position.z,
+    0x58a6ff,
+    scene
   );
   bursts.push(b);
 }
@@ -300,7 +307,7 @@ function spawnPowerUp() {
     Math.random() < 0.5 ? PowerUpType.TRIPLE_SHOT : PowerUpType.SHIELD;
 
   // Pass updateUI so the class can update the UI after effect application
-  powerups.push(new PowerUp(x, y, type, updateUI));
+  powerups.push(new PowerUp(x, y, type, updateUI, scene, playerState));
 }
 
 function spawnInitialHouses() {
@@ -312,7 +319,7 @@ function spawnInitialHouses() {
   const spacing = 20; // distance between houses
 
   for (let x = startX; x < endX; x += spacing) {
-    houses.push(new House(x, -BOUNDARY_Y + 3));
+    houses.push(new House(x, -BOUNDARY_Y + 3, scene));
   }
 }
 
@@ -463,14 +470,39 @@ function updateGame(deltaFactor) {
 
     if (enemyChance < 0.1) {
       // 60% chance for Chaser
-      enemies.push(new Chaser(x, y, game));
+      enemies.push(
+        new Chaser(x, y, game, scene, playerMesh, playerState, bursts)
+      );
     } else if (enemyChance < 0.6) {
       // 25% chance for Cruiser
-      enemies.push(new Cruiser(x, y, game, CRUISER_DETONATE_X, Burst));
+      enemies.push(
+        new Cruiser(
+          x,
+          y,
+          game,
+          CRUISER_DETONATE_X,
+          Burst,
+          scene,
+          playerMesh,
+          playerState,
+          bursts
+        )
+      );
     } else {
       // 15% chance for Scout
       // Pass the loaded base mesh (can be null/fallback)
-      enemies.push(new Scout(x, y, game, scoutBaseMesh)); // <--- ADD SCOUT SPAWNING
+      enemies.push(
+        new Scout(
+          x,
+          y,
+          game,
+          scoutBaseMesh,
+          scene,
+          playerMesh,
+          playerState,
+          bursts
+        )
+      );
     }
     timeSinceEnemySpawn = 0;
   }
@@ -636,10 +668,6 @@ function dropPresentIntoHouse2(house, deltaFactor) {
     // rotation wobble
     present.rotation.z = Math.sin(wobbleTimer * wobbleSpeed) * 0.3;
 
-    // horizontal wobble
-    // present.position.x +=
-    //   Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount * wobbleTimer;
-
     const baseX = present.position.x; // store once before fall()
     present.position.x =
       baseX + Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount;
@@ -652,7 +680,8 @@ function dropPresentIntoHouse2(house, deltaFactor) {
       new PresentSparkle(
         present.position.x,
         present.position.y,
-        present.position.z
+        present.position.z,
+        scene
       )
     );
 
@@ -718,7 +747,8 @@ function dropPresentIntoHouse(house, deltaFactor) {
       new PresentSparkle(
         present.position.x,
         present.position.y,
-        present.position.z
+        present.position.z,
+        scene
       )
     );
 
@@ -732,7 +762,9 @@ function dropPresentIntoHouse(house, deltaFactor) {
           house.mesh.position.x,
           house.mesh.position.y + house.height + 1,
           house.mesh.position.z,
-          camera
+          camera,
+          "Delivered!",
+          scene
         )
       );
       return;
