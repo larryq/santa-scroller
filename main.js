@@ -191,7 +191,7 @@ function loadModels() {
 
   const modelUrl =
     "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
-  const houseModelUrl = "./models/house1.glb";
+  const houseModelUrl = "/models/house1.glb";
 
   return new Promise((resolve) => {
     let loadedCount = 0;
