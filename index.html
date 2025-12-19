@@ -6,7 +6,6 @@
     <title>Galactic Defender 3D</title>
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js Library CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap");
@@ -34,6 +33,45 @@
         overflow: hidden;
         background-color: #010409;
       }
+
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(#0a0a1a, #1a1a3a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        color: white;
+        font-family: "Arial", sans-serif;
+        font-size: 2rem;
+        letter-spacing: 1px;
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      #loading-text {
+        animation: pulse 1.5s infinite ease-in-out;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0.4;
+        }
+      }
+
+      @keyframes fadeOut {
+        to {
+          opacity: 0;
+          visibility: hidden;
+        }
+      }
+
       canvas {
         display: block;
       }
@@ -106,6 +144,9 @@
     </style>
   </head>
   <body>
+    <div id="loading-screen">
+      <div id="loading-text">🎁 Santa is preparing the gifts…</div>
+    </div>
     <div id="game-container">
       <div id="ui" class="ui-panel">
         <div>Score: <span id="score">0</span></div>

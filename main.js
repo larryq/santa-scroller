@@ -44,6 +44,7 @@ let timeSincePowerupSpawn = 0;
 let isGameOver = false;
 let gltfLoader;
 let scoutBaseMesh = null;
+let house1BaseMesh = null;
 let isScoutModelLoaded = false;
 
 // --- Game Arrays (Objects holding mesh and state) ---
@@ -188,30 +189,53 @@ function checkCollision(mesh1, mesh2, radius1, radius2) {
 function loadModels() {
   gltfLoader = new GLTFLoader();
 
-  // NOTE: This uses a placeholder public model.
-  // Change the modelUrl to your specific GLTF/GLB file if you have one!
   const modelUrl =
     "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
+  const houseModelUrl = "./models/house1.glb";
 
-  gltfLoader.load(
-    modelUrl,
-    (gltf) => {
-      // Scale and position the loaded model base
-      scoutBaseMesh = gltf.scene;
-      scoutBaseMesh.scale.set(1.5, 1.5, 1.5);
-      scoutBaseMesh.rotation.y = Math.PI; // Face the correct direction (left)
+  return new Promise((resolve) => {
+    let loadedCount = 0;
 
-      isScoutModelLoaded = true;
-      console.log("Scout model loaded successfully.");
-    },
-    undefined,
-    (error) => {
-      console.error("An error occurred loading the GLTF model:", error);
-      // Fallback: If loading fails, Scout will use the fallback mesh in its constructor
-      isScoutModelLoaded = true;
-      console.log("Using fallback mesh for Scout.");
-    }
-  );
+    const checkDone = () => {
+      loadedCount++;
+      if (loadedCount === 2) resolve();
+    };
+
+    // Load scout
+    gltfLoader.load(
+      modelUrl,
+      (gltf) => {
+        scoutBaseMesh = gltf.scene;
+        scoutBaseMesh.scale.set(1.5, 1.5, 1.5);
+        scoutBaseMesh.rotation.y = Math.PI;
+        isScoutModelLoaded = true;
+        console.log("Scout model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading scout:", error);
+        isScoutModelLoaded = true;
+        checkDone();
+      }
+    );
+
+    // Load house
+    gltfLoader.load(
+      houseModelUrl,
+      (gltf) => {
+        house1BaseMesh = gltf.scene;
+        house1BaseMesh.scale.set(1.5, 1.5, 1.5);
+        console.log("House model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading house:", error);
+        checkDone();
+      }
+    );
+  });
 }
 
 // --- Player Functions ---
@@ -319,7 +343,7 @@ function spawnInitialHouses() {
   const spacing = 20; // distance between houses
 
   for (let x = startX; x < endX; x += spacing) {
-    houses.push(new House(x, -BOUNDARY_Y + 3, scene));
+    houses.push(new House(x, -BOUNDARY_Y - 10, scene, house1BaseMesh));
   }
 }
 
@@ -354,11 +378,14 @@ function setupGame() {
 
   createStarfield();
   createPlayer();
-  loadModels();
+  loadModels().then(() => {
+    const loadingScreen = document.getElementById("loading-screen");
+    loadingScreen.style.animation = "fadeOut 0.5s forwards";
+    spawnInitialHouses();
+  });
 
   // Initialize global references in the classes after playerState is created
   initializeClassGlobals({ scene, playerMesh, game, playerState, bursts });
-  spawnInitialHouses();
 
   updateUI();
   addEventListeners();
@@ -461,6 +488,36 @@ function updateGame(deltaFactor) {
   handlePlayerInput(deltaFactor);
 
   // --- 2. Spawn Enemies and Powerups ---
+  spawnEnemiesAndPowerups(deltaFactor);
+
+  // --- 3. Update and Filter Arrays ---
+  updateArrays(deltaFactor);
+
+  // --- 4. Collision Detection ---
+
+  checkProjectileCollisions();
+
+  // B. Burst-Enemy Collisions
+  bursts.forEach((b) => {
+    if (b.isActive) {
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (!e.mesh) continue;
+        // Note: The Burst class must implement its own check using its current radius
+        if (checkCollision(b.mesh, e.mesh, b.currentRadius, e.radius)) {
+          if (e.takeDamage(b.damage)) {
+            enemies.splice(j, 1);
+          }
+        }
+      }
+    }
+  });
+
+  // C. Player-Enemy Collisions
+  checkPlayerCollisions();
+}
+
+function spawnEnemiesAndPowerups(deltaFactor) {
   timeSinceEnemySpawn += deltaFactor;
   if (timeSinceEnemySpawn >= ENEMY_SPAWN_TIME) {
     const x = ENEMY_SPAWN_X;
@@ -469,12 +526,10 @@ function updateGame(deltaFactor) {
     const enemyChance = Math.random();
 
     if (enemyChance < 0.1) {
-      // 60% chance for Chaser
       enemies.push(
         new Chaser(x, y, game, scene, playerMesh, playerState, bursts)
       );
     } else if (enemyChance < 0.6) {
-      // 25% chance for Cruiser
       enemies.push(
         new Cruiser(
           x,
@@ -512,8 +567,9 @@ function updateGame(deltaFactor) {
     spawnPowerUp();
     timeSincePowerupSpawn = 0;
   }
+}
 
-  // --- 3. Update and Filter Arrays ---
+function updateArrays(deltaFactor) {
   projectiles.forEach((p) => p.update(deltaFactor));
   bursts.forEach((b) => {
     b.update(deltaFactor);
@@ -551,49 +607,9 @@ function updateGame(deltaFactor) {
   });
 
   presentSparkles = presentSparkles.filter((ps) => ps.update(deltaFactor));
+}
 
-  // --- 4. Collision Detection ---
-
-  const nextProjectiles = [];
-
-  // A. Projectile-Enemy Collisions
-  projectiles.forEach((p) => {
-    let hit = false;
-    for (let j = enemies.length - 1; j >= 0; j--) {
-      const e = enemies[j];
-      if (!e.mesh || !p.mesh) continue;
-      if (checkCollision(p.mesh, e.mesh, p.radius, e.radius)) {
-        if (e.takeDamage(p.damage)) {
-          enemies.splice(j, 1);
-        }
-        p.remove();
-        hit = true;
-        break;
-      }
-    }
-    if (!hit) {
-      nextProjectiles.push(p);
-    }
-  });
-  projectiles = nextProjectiles;
-
-  // B. Burst-Enemy Collisions
-  bursts.forEach((b) => {
-    if (b.isActive) {
-      for (let j = enemies.length - 1; j >= 0; j--) {
-        const e = enemies[j];
-        if (!e.mesh) continue;
-        // Note: The Burst class must implement its own check using its current radius
-        if (checkCollision(b.mesh, e.mesh, b.currentRadius, e.radius)) {
-          if (e.takeDamage(b.damage)) {
-            enemies.splice(j, 1);
-          }
-        }
-      }
-    }
-  });
-
-  // C. Player-Enemy Collisions
+function checkPlayerCollisions() {
   if (playerMesh) {
     enemies = enemies.filter((e) => {
       if (!e.mesh) return false;
@@ -617,6 +633,31 @@ function updateGame(deltaFactor) {
     });
     powerups = nextPowerups;
   }
+}
+
+function checkProjectileCollisions() {
+  const nextProjectiles = [];
+
+  // A. Projectile-Enemy Collisions
+  projectiles.forEach((p) => {
+    let hit = false;
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j];
+      if (!e.mesh || !p.mesh) continue;
+      if (checkCollision(p.mesh, e.mesh, p.radius, e.radius)) {
+        if (e.takeDamage(p.damage)) {
+          enemies.splice(j, 1);
+        }
+        p.remove();
+        hit = true;
+        break;
+      }
+    }
+    if (!hit) {
+      nextProjectiles.push(p);
+    }
+  });
+  projectiles = nextProjectiles;
 }
 
 function updateHouses(deltaFactor) {
