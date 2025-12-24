@@ -1,5 +1,5 @@
 import { vertexShader, fragmentShader } from "./shaders/BurstShaders.js";
-
+import * as THREE from "three";
 export class Burst {
   static KINETIC_SPEED = 2.1;
   static EXPLOSION_SPEED = 8.1;

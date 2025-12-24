@@ -1,6 +1,8 @@
 import { Enemy } from "./Enemy.js";
 import { SCOUT_SPEED } from "./constants.js";
 
+import * as THREE from "three";
+
 export class Scout extends Enemy {
   // Requires 'scoutBaseMesh' which is a clone of the loaded GLTF model from main.js
   constructor(
@@ -18,7 +20,6 @@ export class Scout extends Enemy {
     this.originalColor = 0x9999ff;
     this.type = "SCOUT";
 
-    // Replace the base mesh with the GLTF clone
     if (this.mesh) {
       // Remove the placeholder geometry from the super() call
       scene.remove(this.mesh);

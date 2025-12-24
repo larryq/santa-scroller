@@ -1,7 +1,7 @@
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
 export const PLAYER_SPEED = 30; // Units per second
-export const PROJECTILE_SPEED = 60; // Units per second
+export const PROJECTILE_SPEED = 40; // Units per second
 export const CHASER_SPEED = 6; // Original Enemy Speed
 export const CRUISER_SPEED = 5; // New Slower Enemy Speed (Bomber)
 export const ENEMY_SPAWN_TIME = 1.5; // seconds per spawn

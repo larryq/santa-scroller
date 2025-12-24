@@ -12,7 +12,8 @@ export class Cruiser extends Enemy {
     scene,
     playerMesh,
     playerState,
-    bursts
+    bursts,
+    cruiserMesh
   ) {
     super(
       4,
@@ -27,7 +28,6 @@ export class Cruiser extends Enemy {
       bursts
     );
     this.originalColor = 0x44ffaa;
-    this.mesh.position.set(x, y, 0);
     this.type = "CRUISER";
     this.detonateX = CRUISER_DETONATE_X;
     this.BurstClass = BurstClass;
@@ -36,7 +36,44 @@ export class Cruiser extends Enemy {
     this.playerState = playerState;
     this.bursts = bursts;
     this.scene = scene;
-    this.scene.add(this.mesh);
+
+    if (this.mesh) {
+      // Remove the placeholder geometry from the super() call
+      scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      this.mesh.material.dispose();
+    }
+
+    // Use the loaded GLTF model if available, otherwise use a fallback
+    if (cruiserMesh) {
+      // Clone the loaded scene object
+      this.mesh = cruiserMesh.clone();
+      this.mesh.traverse((child) => {
+        if (child.isMesh) {
+          // Ensure each clone has a unique material instance so they don't share color changes
+          child.material = child.material.clone();
+          child.material.emissiveIntensity = 1.0;
+          //child.material.emissive.setHex(this.originalColor);
+        }
+      });
+      this.mesh.scale.set(2.5, 2.5, 2.5);
+    } else {
+      // Fallback in case main.js failed to load the model
+      const geometry = new THREE.BoxGeometry(
+        this.radius * 0.8,
+        this.radius * 0.8,
+        this.radius * 0.8
+      );
+      const material = new THREE.MeshPhongMaterial({
+        color: this.originalColor,
+        emissive: this.originalColor,
+        emissiveIntensity: 0.5,
+      });
+      this.mesh = new THREE.Mesh(geometry, material);
+    }
+
+    this.mesh.position.set(x, y, 0);
+    scene.add(this.mesh);
   }
 
   update(deltaFactor) {
@@ -76,7 +113,9 @@ export class Cruiser extends Enemy {
 
     // Mark for removal
     this.hp = 0;
-    super.die();
+    //no score increase for self-detonation
+    //this.game.addScore(this.scoreValue, this.game.updateUI);
+    this.removeMesh();
   }
 
   die() {
@@ -89,6 +128,29 @@ export class Cruiser extends Enemy {
       this.scene
     );
     this.bursts.push(explosion);
-    super.die();
+    this.game.addScore(this.scoreValue, this.game.updateUI);
+    this.removeMesh();
+  }
+
+  removeMesh() {
+    if (this.mesh) {
+      // Safely dispose of resources within the GLTF model's hierarchy
+      this.mesh.traverse((child) => {
+        if (child.isMesh) {
+          if (child.geometry) child.geometry.dispose();
+
+          // Handle single or multi-material disposal
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m) => m.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        }
+      });
+      this.scene.remove(this.mesh);
+    }
+    this.mesh = null;
   }
 }

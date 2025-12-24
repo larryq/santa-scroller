@@ -1,3 +1,4 @@
+import * as THREE from "three";
 export class House {
   constructor(x, y, scene, houseBaseMesh) {
     this.width = 12; // adjust to taste

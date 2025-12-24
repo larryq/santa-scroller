@@ -7,6 +7,7 @@ import {
   plasmaVertexShader2,
   plasmaFragmentShader2,
 } from "./shaders/PlasmaBurstShaders2.js";
+import * as THREE from "three";
 
 export class PlasmaBurst {
   constructor(x, y, z, color = 0x58a6ff, scene) {

@@ -1,3 +1,4 @@
+import * as THREE from "three";
 export class Enemy {
   constructor(radius, hp, scoreValue, color, speed, game, scene) {
     this.radius = radius;
@@ -21,11 +22,23 @@ export class Enemy {
   update(deltaFactor) {
     if (!this.mesh) return;
     this.mesh.position.x -= this.speed * deltaFactor;
+    this.mesh.position.y += (Math.random() - 0.5) * 0.1;
     this.mesh.rotation.y += 0.05 * deltaFactor * 60;
+
+    if (this.knockbackVelocityX > 0) {
+      this.mesh.position.x += this.knockbackVelocityX;
+      this.mesh.position.y += this.knockbackVelocityY;
+
+      // Slow the bounce down over time
+      this.knockbackVelocityX *= 0.9;
+      this.knockbackVelocityY *= 0.9;
+    }
   }
 
   takeDamage(damage) {
     this.hp -= damage;
+    this.knockbackVelocityX = 0.2;
+    this.knockbackVelocityY = (Math.random() - 0.5) * 0.1;
 
     if (this.mesh && this.mesh.material) {
       this.mesh.material.color.setHex(0xffaaaa);
@@ -33,6 +46,7 @@ export class Enemy {
         if (this.mesh) this.mesh.material.color.setHex(this.originalColor);
       }, 100);
     }
+    this.mesh.position.x += 0.5; // Knockback effect
 
     if (this.hp <= 0) {
       this.die();

@@ -1,3 +1,5 @@
+import * as THREE from "three";
+
 function getVisibleHeightAtZ(z, camera) {
   const distance = Math.abs(z - camera.position.z);
   const vFOV = (camera.fov * Math.PI) / 180; // convert to radians

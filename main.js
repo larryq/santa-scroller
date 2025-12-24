@@ -14,6 +14,7 @@ import {
   PowerUpType,
 } from "./constants.js";
 
+import * as THREE from "three";
 import { initializeClassGlobals } from "./GameClasses.js";
 
 import { Game } from "./Game.js";
@@ -45,6 +46,11 @@ let isGameOver = false;
 let gltfLoader;
 let scoutBaseMesh = null;
 let house1BaseMesh = null;
+let TripleShotBaseMesh = null;
+let christmasBallBaseMesh = null;
+let presentMesh = null;
+let sleighMesh = null;
+let cruiserMesh = null;
 let isScoutModelLoaded = false;
 
 // --- Game Arrays (Objects holding mesh and state) ---
@@ -192,13 +198,18 @@ function loadModels() {
   const modelUrl =
     "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
   const houseModelUrl = "/models/house1.glb";
+  const tripleShotURL = "/models/RocketLauncher.gltf";
+  const christmasBallURL = "/models/green_christmas_ball.glb";
+  const presentURL = "/models/present_drop.glb";
+  const sleighURL = "/models/sleigh.glb";
+  const cruiserURL = "/models/saucer1.glb";
 
   return new Promise((resolve) => {
     let loadedCount = 0;
 
     const checkDone = () => {
       loadedCount++;
-      if (loadedCount === 2) resolve();
+      if (loadedCount === 7) resolve();
     };
 
     // Load scout
@@ -235,6 +246,76 @@ function loadModels() {
         checkDone();
       }
     );
+    // Load Triple Shot model
+    gltfLoader.load(
+      tripleShotURL,
+      (gltf) => {
+        TripleShotBaseMesh = gltf.scene;
+        TripleShotBaseMesh.scale.set(3.0, 3.0, 3.0);
+        console.log("Triple Shot model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Triple Shot:", error);
+        checkDone();
+      }
+    );
+    // Load christmas ball projectile  model
+    gltfLoader.load(
+      christmasBallURL,
+      (gltf) => {
+        christmasBallBaseMesh = gltf.scene;
+        //christmasBallBaseMesh.scale.set(3.0, 3.0, 3.0);
+        christmasBallBaseMesh.rotation.y = Math.PI / 2;
+        console.log("Christmas ball model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Christmas ball:", error);
+        checkDone();
+      }
+    );
+    gltfLoader.load(
+      presentURL,
+      (gltf) => {
+        presentMesh = gltf.scene;
+        console.log("Present model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Present:", error);
+        checkDone();
+      }
+    );
+    gltfLoader.load(
+      sleighURL,
+      (gltf) => {
+        sleighMesh = gltf.scene;
+        console.log("Sleigh model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Sleigh:", error);
+        checkDone();
+      }
+    );
+    gltfLoader.load(
+      cruiserURL,
+      (gltf) => {
+        cruiserMesh = gltf.scene;
+        console.log("Cruiser model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Cruiser:", error);
+        checkDone();
+      }
+    );
   });
 }
 
@@ -245,21 +326,23 @@ function loadModels() {
  */
 function createPlayer() {
   if (playerMesh) scene.remove(playerMesh);
+  if (sleighMesh) {
+    // Clone the loaded scene object
+    playerMesh = sleighMesh.clone();
+    playerMesh.position.copy(playerMesh.position);
+    playerMesh.scale.set(3.0, 3.0, 3.0);
+    playerMesh.rotation.y = Math.PI / 2;
+    playerMesh.traverse((child) => {
+      if (child.isMesh) {
+        // Ensure each clone has a unique material instance so they don't share color changes
+        child.material = child.material.clone();
+        child.material.emissiveIntensity = 0.5;
+      }
+    });
+  }
 
-  const geometry = new THREE.ConeGeometry(2, 4, 32);
-  const material = new THREE.MeshPhongMaterial({
-    color: 0x58a6ff,
-    emissive: 0x00ffff,
-    shininess: 100,
-  });
-  playerMesh = new THREE.Mesh(geometry, material);
-
-  playerMesh.position.set(-BOUNDARY_X + 5, 0, 0);
-  playerMesh.rotation.z = -Math.PI / 2;
-  playerMesh.rotation.y = Math.PI / 2;
   scene.add(playerMesh);
 
-  // Initialize PlayerState, passing required external functions
   playerState = new PlayerState(
     BURST_COOLDOWN_SECONDS,
     updateUI,
@@ -281,7 +364,8 @@ function shoot() {
     playerMesh.position.x,
     playerMesh.position.y,
     playerMesh.position.z - 2,
-    scene
+    scene,
+    christmasBallBaseMesh
   );
   projectiles.push(p1);
 
@@ -292,14 +376,16 @@ function shoot() {
       playerMesh.position.x,
       playerMesh.position.y + 1,
       playerMesh.position.z - 2,
-      scene
+      scene,
+      christmasBallBaseMesh
     );
     // Projectile 3: Offset DOWN on the Y-axis
     const p3 = new Projectile(
       playerMesh.position.x,
       playerMesh.position.y - 1,
       playerMesh.position.z - 2,
-      scene
+      scene,
+      christmasBallBaseMesh
     );
     projectiles.push(p2, p3);
   }
@@ -328,10 +414,12 @@ function spawnPowerUp() {
   const y = THREE.MathUtils.randFloatSpread(BOUNDARY_Y * 2);
 
   const type =
-    Math.random() < 0.5 ? PowerUpType.TRIPLE_SHOT : PowerUpType.SHIELD;
+    Math.random() < 0.995 ? PowerUpType.TRIPLE_SHOT : PowerUpType.SHIELD;
 
   // Pass updateUI so the class can update the UI after effect application
-  powerups.push(new PowerUp(x, y, type, updateUI, scene, playerState));
+  powerups.push(
+    new PowerUp(x, y, type, updateUI, scene, playerState, TripleShotBaseMesh)
+  );
 }
 
 function spawnInitialHouses() {
@@ -377,20 +465,21 @@ function setupGame() {
   }
 
   createStarfield();
-  createPlayer();
+
   loadModels().then(() => {
     const loadingScreen = document.getElementById("loading-screen");
     loadingScreen.style.animation = "fadeOut 0.5s forwards";
     spawnInitialHouses();
+    createPlayer();
+    //initializeClassGlobals({ scene, playerMesh, game, playerState, bursts });
+    updateUI();
+    addEventListeners();
+
+    isGameOver = false;
+    frameCount = 0;
   });
 
   // Initialize global references in the classes after playerState is created
-  initializeClassGlobals({ scene, playerMesh, game, playerState, bursts });
-
-  updateUI();
-  addEventListeners();
-  isGameOver = false;
-  frameCount = 0;
 }
 
 /**
@@ -437,7 +526,17 @@ function handlePlayerInput(deltaFactor) {
   );
   playerMesh.position.y = Math.max(
     -BOUNDARY_Y + 5,
-    Math.min(BOUNDARY_Y - 5, playerMesh.position.y + dy)
+    Math.min(BOUNDARY_Y + 1.5, playerMesh.position.y + dy)
+  );
+
+  // sparkles
+  presentSparkles.push(
+    new PresentSparkle(
+      playerMesh.position.x - 2.7,
+      playerMesh.position.y + 1.28,
+      playerMesh.position.z,
+      scene
+    )
   );
 
   // Cooldown management
@@ -540,7 +639,8 @@ function spawnEnemiesAndPowerups(deltaFactor) {
           scene,
           playerMesh,
           playerState,
-          bursts
+          bursts,
+          cruiserMesh
         )
       );
     } else {
@@ -683,74 +783,38 @@ function updateHouses(deltaFactor) {
   }
 }
 
-function dropPresentIntoHouse2(house, deltaFactor) {
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshPhongMaterial({
-    color: 0xff0000,
-    emissive: 0xaa0000,
-  });
-
-  let wobbleTimer = 0;
-
-  const present = new THREE.Mesh(geometry, material);
-  present.position.copy(playerMesh.position);
-
-  scene.add(present);
-
-  // Animate falling
-  const fallSpeed = 2.5;
-
-  const fall = () => {
-    // wobble parameters
-    const wobbleSpeed = 3; // how fast it wiggles
-    const wobbleAmount = 0.1; // how wide the wobble is
-    wobbleTimer += 0.026;
-
-    // rotation wobble
-    present.rotation.z = Math.sin(wobbleTimer * wobbleSpeed) * 0.3;
-
-    const baseX = present.position.x; // store once before fall()
-    present.position.x =
-      baseX + Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount;
-
-    if (!present.parent) return;
-
-    present.position.y -= 0.1;
-
-    presentSparkles.push(
-      new PresentSparkle(
-        present.position.x,
-        present.position.y,
-        present.position.z,
-        scene
-      )
-    );
-
-    if (present.position.y <= house.mesh.position.y + house.height / 2) {
-      scene.remove(present);
-      present.geometry.dispose();
-      present.material.dispose();
-      return;
-    }
-
-    requestAnimationFrame(fall);
-  };
-
-  fall();
-}
-
 function dropPresentIntoHouse(house, deltaFactor) {
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshPhongMaterial({
-    color: 0xff0000,
-    emissive: 0xaa0000,
-  });
-
   let wobbleTimer = 0;
   let fallTimer = wobbleTimer;
+  let present = null;
 
-  const present = new THREE.Mesh(geometry, material);
-  present.position.copy(playerMesh.position);
+  if (presentMesh) {
+    // Clone the loaded scene object
+    present = presentMesh.clone();
+    present.scale.set(0.5, 0.5, 0.5);
+    present.position.copy(playerMesh.position);
+    present.position.y -= 7; // start slightly below the sleigh
+    present.traverse((child) => {
+      if (child.isMesh) {
+        // Ensure each clone has a unique material instance so they don't share color changes
+        child.material = child.material.clone();
+        child.material.emissiveIntensity = 0.5;
+      }
+    });
+  } else {
+    // Fallback in case main.js failed to load the model
+    const geometry = new THREE.BoxGeometry(
+      this.radius * 0.8,
+      this.radius * 0.8,
+      this.radius * 0.8
+    );
+    const material = new THREE.MeshPhongMaterial({
+      color: this.originalColor,
+      emissive: this.originalColor,
+      emissiveIntensity: 0.5,
+    });
+    present = new THREE.Mesh(geometry, material);
+  }
 
   scene.add(present);
 
@@ -758,7 +822,7 @@ function dropPresentIntoHouse(house, deltaFactor) {
   const baseX = present.position.x;
 
   // IMPORTANT: match the house's actual scroll speed
-  const houseScrollSpeed = 5; // same number you use in house.update()
+  const houseScrollSpeed = 5; //need to get rid of this magic number later
 
   const fall = () => {
     if (!present.parent) return;
@@ -767,12 +831,14 @@ function dropPresentIntoHouse(house, deltaFactor) {
     wobbleTimer += deltaFactor;
     fallTimer += deltaFactor;
 
-    const wobbleSpeed = 8;
-    const wobbleAmount = 0.9;
+    const wobbleSpeed = 2;
+    const wobbleAmount = 0.2;
     const wobble = Math.sin(wobbleTimer * wobbleSpeed) * wobbleAmount;
 
     // rotation wobble
-    present.rotation.z = wobble * 1.5;
+    present.rotation.y += wobble * 0.02;
+    //present.rotation.z = wobble * 1.5;
+    present.rotation.y -= Math.PI / 120;
 
     // ✅ horizontal tracking: match house movement exactly
     const scrollOffset = houseScrollSpeed * fallTimer;
@@ -783,21 +849,30 @@ function dropPresentIntoHouse(house, deltaFactor) {
     // vertical fall
     present.position.y -= 5 * deltaFactor;
 
-    // sparkles
-    presentSparkles.push(
-      new PresentSparkle(
-        present.position.x,
-        present.position.y,
-        present.position.z,
-        scene
-      )
-    );
-
     // landing
     if (present.position.y <= house.mesh.position.y + house.height / 2) {
-      scene.remove(present);
-      present.geometry.dispose();
-      present.material.dispose();
+      if (present) {
+        // Safely dispose of resources within the GLTF model's hierarchy
+        present.traverse((child) => {
+          if (child.isMesh) {
+            if (child.geometry) child.geometry.dispose();
+
+            // Handle single or multi-material disposal
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach((m) => m.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          }
+        });
+        scene.remove(present);
+      }
+
+      //   scene.remove(present);
+      //   present.geometry.dispose();
+      //   present.material.dispose();
       deliveryPopups.push(
         new DeliveryPopup(
           house.mesh.position.x,
