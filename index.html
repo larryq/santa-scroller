@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Galactic Defender 3D</title>
+    <title>Santa Stops the Alien Invasion</title>
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> -->
@@ -150,9 +150,79 @@
         font-weight: bold;
         color: #58a6ff;
       }
+
+      #introScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-family: sans-serif;
+        z-index: 10;
+      }
+
+      #introScreen h1 {
+        margin-bottom: 20px;
+        font-size: 4rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-weight: 800;
+        color: #e0faff;
+        text-shadow: 0 0 10px #00eaff55, 0 0 20px #00eaff33;
+      }
+
+      #introScreen p {
+        margin: 8px 0;
+        font-size: 1.4rem;
+        opacity: 0.85;
+        color: #e0faff;
+      }
+
+      #startButton {
+        margin-top: 40px;
+        padding: 14px 32px;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #001015;
+        background: linear-gradient(135deg, #00eaff, #00bcd4);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 0 12px #00eaff88, 0 0 24px #00eaff44;
+        transition: transform 0.15s ease, box-shadow 0.2s ease;
+      }
+
+      #startButton:hover {
+        transform: scale(1.08);
+        box-shadow: 0 0 18px #00eaffaa, 0 0 36px #00eaff66;
+      }
+
+      #startButton:active {
+        transform: scale(0.96);
+        box-shadow: 0 0 8px #00eaff66;
+      }
     </style>
   </head>
   <body>
+    <div id="introScreen">
+      <h1>Santa Saves Christmas</h1>
+      <p>Aliens are trying to ruin Christmas! How rude.</p>
+      <p>As you fly over a home a present will drop for the children below.</p>
+      <p>Use WASD or arrow keys to move</p>
+      <p>Press SPACE to fire</p>
+      <p>Press E for an energy plasma burst (one every 5 seconds)</p>
+      <p>
+        Power up with the bazookas and shields and destroy the Robots, Saucers
+        and magnetic mines!
+      </p>
+      <button id="startButton">Start Game</button>
+    </div>
     <div id="loading-screen">
       <div id="loading-text">🎁 Santa is preparing the gifts…</div>
     </div>
@@ -170,9 +240,9 @@
         <div class="flex gap-4">
           <div id="burst-cooldown">Burst (E/Shift): Ready</div>
           <!-- Note: restartGame is exposed globally from main.js for the onclick handler -->
-          <button id="restart-btn" class="btn" onclick="restartGame()">
+          <!-- <button id="restart-btn" class="btn" onclick="restartGame()">
             Restart
-          </button>
+          </button> -->
         </div>
       </div>
       <div id="three-container"></div>

@@ -56,6 +56,7 @@ let chaserMesh = null;
 let shield = null;
 let shieldMesh = null;
 let isScoutModelLoaded = false;
+let gameStarted = false;
 
 // --- Game Arrays (Objects holding mesh and state) ---
 let enemyProjectiles = [];
@@ -492,8 +493,8 @@ function spawnInitialHouses() {
   houses.forEach((h) => h.remove());
   houses = [];
 
-  const startX = -BOUNDARY_X * 3;
-  const endX = BOUNDARY_X * 4; // extend far to the right
+  const startX = -BOUNDARY_X * 7;
+  const endX = BOUNDARY_X * 7; // extend far to the right
   const spacing = 20; // distance between houses
 
   for (let x = startX; x < endX; x += spacing) {
@@ -592,9 +593,10 @@ function handlePlayerInput(deltaFactor) {
   if (keys["s"] || keys["arrowdown"]) dy -= moveAmount;
 
   // Apply movement and boundary checks
+  const EXTRA = 5; // allow some leeway offscreen for player movement
   playerMesh.position.x = Math.max(
-    -BOUNDARY_X,
-    Math.min(BOUNDARY_X, playerMesh.position.x + dx)
+    -(BOUNDARY_X + EXTRA + 4),
+    Math.min(BOUNDARY_X + EXTRA, playerMesh.position.x + dx)
   );
   playerMesh.position.y = Math.max(
     -BOUNDARY_Y + 5,
@@ -696,8 +698,11 @@ function spawnEnemiesAndPowerups(deltaFactor) {
   timeSinceEnemySpawn += deltaFactor;
   if (timeSinceEnemySpawn >= ENEMY_SPAWN_TIME) {
     const x = ENEMY_SPAWN_X;
-    const y = THREE.MathUtils.randFloatSpread(BOUNDARY_Y * 2);
-
+    let y = THREE.MathUtils.randFloatSpread(BOUNDARY_Y * 2);
+    if (y < -BOUNDARY_Y + 3) {
+      //y = -BOUNDARY_Y + 10;
+      y += 5;
+    }
     const enemyChance = Math.random();
 
     if (enemyChance < 0.3) {
@@ -901,9 +906,9 @@ function checkEnemyProjectileCollisions() {
 function updateHouses(deltaFactor) {
   houses.forEach((h) => h.update(deltaFactor));
   houses.forEach((h) => {
-    if (h.mesh.position.x < -BOUNDARY_X - 20) {
+    if (h.mesh.position.x < -BOUNDARY_X - 120) {
       // Move house to the far right to recycle it
-      h.mesh.position.x += BOUNDARY_X * 2 + 40;
+      h.mesh.position.x += BOUNDARY_X * 2 + 180;
       h.hasReceivedPresent = false;
     }
   });
@@ -926,7 +931,7 @@ function dropPresentIntoHouse(house, deltaFactor) {
   let fallTimer = wobbleTimer;
   let present = null;
 
-  if (presentMesh) {
+  if (presentMesh && gameStarted && deltaFactor > 0) {
     // Clone the loaded scene object
     present = presentMesh.clone();
     present.scale.set(0.67, 0.67, 0.67);
@@ -939,19 +944,6 @@ function dropPresentIntoHouse(house, deltaFactor) {
         //child.material.emissiveIntensity = 0.5;
       }
     });
-  } else {
-    // Fallback in case main.js failed to load the model
-    const geometry = new THREE.BoxGeometry(
-      this.radius * 0.8,
-      this.radius * 0.8,
-      this.radius * 0.8
-    );
-    const material = new THREE.MeshPhongMaterial({
-      color: this.originalColor,
-      emissive: this.originalColor,
-      emissiveIntensity: 0.5,
-    });
-    present = new THREE.Mesh(geometry, material);
   }
 
   scene.add(present);
@@ -1027,23 +1019,27 @@ function dropPresentIntoHouse(house, deltaFactor) {
   fall();
 }
 
+document.getElementById("startButton").addEventListener("click", () => {
+  document.getElementById("introScreen").style.display = "none";
+  gameStarted = true;
+});
 /**
  * The main rendering loop.
  */
 function animate() {
   animationFrameId = requestAnimationFrame(animate);
 
-  const delta = clock.getDelta();
-  const deltaFactor = Math.min(delta, 0.05);
-
-  if (!isGameOver) {
-    updateGame(deltaFactor);
+  if (gameStarted) {
+    const delta = clock.getDelta();
+    const deltaFactor = Math.min(delta, 0.05);
+    if (!isGameOver) {
+      updateGame(deltaFactor);
+    }
+    // Starfield parallax effect
+    const time = clock.getElapsedTime();
+    camera.position.x = Math.sin(time * 0.1) * 2;
+    starfield.rotation.y += 0.0005;
   }
-
-  // Starfield parallax effect
-  const time = clock.getElapsedTime();
-  camera.position.x = Math.sin(time * 0.1) * 2;
-  starfield.rotation.y += 0.0005;
 
   renderer.render(scene, camera);
 }

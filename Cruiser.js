@@ -3,7 +3,7 @@ import { Enemy } from "./Enemy.js";
 import { Burst } from "./Burst.js";
 import { Projectile } from "./Projectile.js";
 
-const MIN_FIRE_DISTANCE = 8;
+const MIN_FIRE_DISTANCE = 15;
 
 export class Cruiser extends Enemy {
   constructor(
@@ -106,32 +106,9 @@ export class Cruiser extends Enemy {
 
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // // 1. Start flashing when close enough
-    // if (!this.isFlashing && distance <= this.flashDistance) {
-    //   this.isFlashing = true;
-    //   this.flashTimer = 0;
-    // }
-
-    // // 2. If flashing, animate and count down
-    // if (this.isFlashing) {
-    //   this.flashTimer += deltaFactor;
-
-    //   // Flash effect: toggle visibility or material color
-    //   const flash = Math.sin(this.flashTimer * 20) > 0;
-    //   this.mesh.visible = flash;
-
-    //   // After flashing long enough, explode
-    //   if (this.flashTimer >= this.flashDuration) {
-    //     this.mesh.visible = true; // ensure visible at explosion moment
-    //     this.explode();
-    //   }
-
-    //   return;
-    // }
-
     // 3. Fire projectiles periodically when not flashing, and dont fire too close
     if (
-      Math.random() < 0.44 * deltaFactor &&
+      Math.random() < 0.39 * deltaFactor &&
       !this.isFlashing &&
       distance > MIN_FIRE_DISTANCE
     ) {
@@ -166,8 +143,7 @@ export class Cruiser extends Enemy {
 
     // Mark for removal
     this.hp = 0;
-    //no score increase for self-detonation
-    //this.game.addScore(this.scoreValue, this.game.updateUI);
+
     this.removeMesh();
   }
 
@@ -228,7 +204,6 @@ export class Cruiser extends Enemy {
     projectile.update = function (deltaFactor) {
       this.mesh.position.x += speedX * deltaFactor;
       this.mesh.position.y += speedY * deltaFactor;
-      //this.mesh.rotation.y += 0.1 * deltaFactor * 60;
     };
 
     this.projectiles.push(projectile);
