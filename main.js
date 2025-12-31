@@ -29,6 +29,7 @@ import { PowerUp } from "./PowerUp.js";
 import { House } from "./House.js";
 import { PresentSparkle } from "./PresentSparkle.js";
 import { DeliveryPopup } from "./DeliveryPopup.js";
+import { Shield } from "./Shield.js";
 
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 // --- Three.js Globals (State) ---
@@ -51,9 +52,13 @@ let christmasBallBaseMesh = null;
 let presentMesh = null;
 let sleighMesh = null;
 let cruiserMesh = null;
+let chaserMesh = null;
+let shield = null;
+let shieldMesh = null;
 let isScoutModelLoaded = false;
 
 // --- Game Arrays (Objects holding mesh and state) ---
+let enemyProjectiles = [];
 let projectiles = [];
 let enemies = [];
 let bursts = [];
@@ -61,6 +66,7 @@ let powerups = [];
 let houses = [];
 let presentSparkles = [];
 let deliveryPopups = [];
+let container = null;
 
 // --- Utility Functions ---
 
@@ -69,7 +75,7 @@ let deliveryPopups = [];
  */
 function initThree() {
   scene = new THREE.Scene();
-  const container = document.getElementById("three-container");
+  container = document.getElementById("three-container");
 
   if (container) {
     while (container.firstChild) {
@@ -89,7 +95,10 @@ function initThree() {
 
   // Setup Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
   if (container) {
     container.appendChild(renderer.domElement);
   }
@@ -102,15 +111,31 @@ function initThree() {
   scene.add(directionalLight);
 }
 
+function onWindowResize() {
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+}
+
 /**
  * Creates a background starfield.
  */
 function createStarfield() {
   const vertices = [];
+  const MIN_DISTANCE = 150; // no stars within 150 units of origin
   for (let i = 0; i < 1000; i++) {
-    const x = THREE.MathUtils.randFloatSpread(500);
-    const y = THREE.MathUtils.randFloatSpread(500);
-    const z = THREE.MathUtils.randFloatSpread(500);
+    let x, y, z, dist;
+    do {
+      x = THREE.MathUtils.randFloatSpread(500);
+      y = THREE.MathUtils.randFloatSpread(500);
+      z = THREE.MathUtils.randFloatSpread(500);
+      dist = Math.sqrt(x * x + y * y + z * z);
+    } while (dist < MIN_DISTANCE);
     vertices.push(x, y, z);
   }
 
@@ -195,21 +220,24 @@ function checkCollision(mesh1, mesh2, radius1, radius2) {
 function loadModels() {
   gltfLoader = new GLTFLoader();
 
-  const modelUrl =
-    "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
+  //robot model courtest of three.js examples-- https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb
+  const modelUrl = "/models/Robot.glb";
+  //const modelUrl = "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
   const houseModelUrl = "/models/house1.glb";
-  const tripleShotURL = "/models/RocketLauncher.gltf";
+  const tripleShotURL = "/models/RocketLauncher.gltf"; //launcher courtesy of https://quaternius.com/packs/toonshootergamekit.html
   const christmasBallURL = "/models/green_christmas_ball.glb";
   const presentURL = "/models/present_drop.glb";
-  const sleighURL = "/models/sleigh.glb";
+  const sleighURL = "/models/sleigh.glb"; //sleigh courtesy of https://www.turbosquid.com/3d-models/christmas-sleigh-3d-model-2497551
   const cruiserURL = "/models/saucer1.glb";
+  const chaserURL = "/models/chaser.glb";
+  const shieldURL = "/models/shield.glb";
 
   return new Promise((resolve) => {
     let loadedCount = 0;
 
     const checkDone = () => {
       loadedCount++;
-      if (loadedCount === 7) resolve();
+      if (loadedCount === 9) resolve();
     };
 
     // Load scout
@@ -316,6 +344,32 @@ function loadModels() {
         checkDone();
       }
     );
+    gltfLoader.load(
+      chaserURL,
+      (gltf) => {
+        chaserMesh = gltf.scene;
+        console.log("Chaser model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Chaser:", error);
+        checkDone();
+      }
+    );
+    gltfLoader.load(
+      shieldURL,
+      (gltf) => {
+        shieldMesh = gltf.scene;
+        console.log("Shield model loaded successfully.");
+        checkDone();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading Shield:", error);
+        checkDone();
+      }
+    );
   });
 }
 
@@ -336,13 +390,14 @@ function createPlayer() {
       if (child.isMesh) {
         // Ensure each clone has a unique material instance so they don't share color changes
         child.material = child.material.clone();
-        child.material.emissiveIntensity = 0.5;
+        //child.material.emissiveIntensity = 0.5;
       }
     });
   }
 
   scene.add(playerMesh);
-
+  //create shield
+  shield = new Shield(0x00ffff, game, playerMesh, scene);
   playerState = new PlayerState(
     BURST_COOLDOWN_SECONDS,
     updateUI,
@@ -350,7 +405,8 @@ function createPlayer() {
     playerMesh,
     playerState,
     scene,
-    game
+    game,
+    shield
   );
 }
 
@@ -400,7 +456,8 @@ function activateBurst() {
     playerMesh.position.x,
     playerMesh.position.y,
     playerMesh.position.z,
-    0x58a6ff,
+    0xbd232fff,
+    //0x58a6ff,
     scene
   );
   bursts.push(b);
@@ -414,11 +471,20 @@ function spawnPowerUp() {
   const y = THREE.MathUtils.randFloatSpread(BOUNDARY_Y * 2);
 
   const type =
-    Math.random() < 0.995 ? PowerUpType.TRIPLE_SHOT : PowerUpType.SHIELD;
+    Math.random() < 0.65 ? PowerUpType.TRIPLE_SHOT : PowerUpType.SHIELD;
 
   // Pass updateUI so the class can update the UI after effect application
   powerups.push(
-    new PowerUp(x, y, type, updateUI, scene, playerState, TripleShotBaseMesh)
+    new PowerUp(
+      x,
+      y,
+      type,
+      updateUI,
+      scene,
+      playerState,
+      TripleShotBaseMesh,
+      shieldMesh
+    )
   );
 }
 
@@ -426,12 +492,12 @@ function spawnInitialHouses() {
   houses.forEach((h) => h.remove());
   houses = [];
 
-  const startX = -BOUNDARY_X;
-  const endX = BOUNDARY_X * 3; // extend far to the right
+  const startX = -BOUNDARY_X * 3;
+  const endX = BOUNDARY_X * 4; // extend far to the right
   const spacing = 20; // distance between houses
 
   for (let x = startX; x < endX; x += spacing) {
-    houses.push(new House(x, -BOUNDARY_Y - 10, scene, house1BaseMesh));
+    houses.push(new House(x, -BOUNDARY_Y - 12, scene, house1BaseMesh));
   }
 }
 
@@ -442,10 +508,7 @@ function spawnInitialHouses() {
  */
 function setupGame() {
   initThree();
-  //   const projectiles = [];
-  //   const enemies = [];
-  //   const bursts = [];
-  //   const powerups = [];
+
   // Initialize main game object
   game = new Game(updateUI);
   keys = {};
@@ -500,6 +563,8 @@ function addEventListeners() {
   window.onkeyup = (e) => {
     keys[e.key.toLowerCase()] = false;
   };
+
+  window.addEventListener("resize", onWindowResize);
 }
 
 /**
@@ -512,10 +577,17 @@ function handlePlayerInput(deltaFactor) {
 
   let dx = 0;
   let dy = 0;
+  let movingForward = false; //only show sparkles when moving forward
 
   // Movement
-  if (keys["a"] || keys["arrowleft"]) dx -= moveAmount;
-  if (keys["d"] || keys["arrowright"]) dx += moveAmount;
+  if (keys["a"] || keys["arrowleft"]) {
+    dx -= moveAmount;
+  }
+  if (keys["d"] || keys["arrowright"]) {
+    dx += moveAmount;
+    movingForward = true;
+  }
+
   if (keys["w"] || keys["arrowup"]) dy += moveAmount;
   if (keys["s"] || keys["arrowdown"]) dy -= moveAmount;
 
@@ -530,14 +602,16 @@ function handlePlayerInput(deltaFactor) {
   );
 
   // sparkles
-  presentSparkles.push(
-    new PresentSparkle(
-      playerMesh.position.x - 2.7,
-      playerMesh.position.y + 1.28,
-      playerMesh.position.z,
-      scene
-    )
-  );
+  if (movingForward) {
+    presentSparkles.push(
+      new PresentSparkle(
+        playerMesh.position.x - 2.7,
+        playerMesh.position.y + 1.28,
+        playerMesh.position.z,
+        scene
+      )
+    );
+  }
 
   // Cooldown management
   if (playerState.fireCooldown > 0) playerState.fireCooldown -= deltaFactor;
@@ -595,6 +669,8 @@ function updateGame(deltaFactor) {
   // --- 4. Collision Detection ---
 
   checkProjectileCollisions();
+  checkEnemyProjectileCollisions();
+  updateShield(deltaFactor);
 
   // B. Burst-Enemy Collisions
   bursts.forEach((b) => {
@@ -624,9 +700,19 @@ function spawnEnemiesAndPowerups(deltaFactor) {
 
     const enemyChance = Math.random();
 
-    if (enemyChance < 0.1) {
+    if (enemyChance < 0.3) {
       enemies.push(
-        new Chaser(x, y, game, scene, playerMesh, playerState, bursts)
+        new Chaser(
+          x,
+          y,
+          Burst,
+          game,
+          scene,
+          playerMesh,
+          playerState,
+          bursts,
+          chaserMesh
+        )
       );
     } else if (enemyChance < 0.6) {
       enemies.push(
@@ -640,12 +726,11 @@ function spawnEnemiesAndPowerups(deltaFactor) {
           playerMesh,
           playerState,
           bursts,
-          cruiserMesh
+          cruiserMesh,
+          enemyProjectiles
         )
       );
     } else {
-      // 15% chance for Scout
-      // Pass the loaded base mesh (can be null/fallback)
       enemies.push(
         new Scout(
           x,
@@ -655,7 +740,8 @@ function spawnEnemiesAndPowerups(deltaFactor) {
           scene,
           playerMesh,
           playerState,
-          bursts
+          bursts,
+          Burst
         )
       );
     }
@@ -674,19 +760,14 @@ function updateArrays(deltaFactor) {
   bursts.forEach((b) => {
     b.update(deltaFactor);
   });
-
+  enemyProjectiles.forEach((p) => p.update(deltaFactor));
   enemies.forEach((e) => e.update(deltaFactor));
   powerups.forEach((p) => p.update(deltaFactor));
   updateHouses(deltaFactor);
   deliveryPopups.forEach((dp) => dp.update(deltaFactor, camera));
 
   // Filter out expired objects
-  projectiles = projectiles.filter((p) => {
-    const shouldKeep = p.mesh && p.mesh.position.x < BOUNDARY_X + 5;
-    if (!shouldKeep && p.mesh) p.remove();
-    return shouldKeep;
-  });
-
+  clearProjectilesFromScreen();
   const activeBursts = bursts.filter((b) => b.isActive);
   bursts.length = 0; // Clear the array, keeping the reference
   bursts.push(...activeBursts); // Push back the active elements
@@ -709,11 +790,39 @@ function updateArrays(deltaFactor) {
   presentSparkles = presentSparkles.filter((ps) => ps.update(deltaFactor));
 }
 
+function clearProjectilesFromScreen() {
+  projectiles = projectiles.filter((p) => {
+    const shouldKeep = p.mesh && p.mesh.position.x < BOUNDARY_X + 5;
+    if (!shouldKeep && p.mesh) p.remove();
+    return shouldKeep;
+  });
+
+  const filtered = enemyProjectiles.filter((p) => {
+    const shouldKeep =
+      p.mesh &&
+      p.mesh.position.x > -BOUNDARY_X &&
+      p.mesh.position.x < BOUNDARY_X &&
+      p.mesh.position.y > -BOUNDARY_Y &&
+      p.mesh.position.y < BOUNDARY_Y;
+
+    if (!shouldKeep && p.mesh) p.remove();
+    return shouldKeep;
+  });
+  enemyProjectiles.length = 0;
+  enemyProjectiles.push(...filtered);
+}
+
 function checkPlayerCollisions() {
   if (playerMesh) {
     enemies = enemies.filter((e) => {
       if (!e.mesh) return false;
-      if (checkCollision(playerMesh, e.mesh, playerState.radius, e.radius)) {
+      let playerRadius;
+      if (playerState.shield.isShieldVisible()) {
+        playerRadius = playerState.shield.getRadius();
+      } else {
+        playerRadius = playerState.radius;
+      }
+      if (checkCollision(playerMesh, e.mesh, playerRadius, e.radius)) {
         playerState.takeDamage(1); // All enemy types deal 1 damage on crash (if not shield)
         e.die();
         return false;
@@ -760,6 +869,35 @@ function checkProjectileCollisions() {
   projectiles = nextProjectiles;
 }
 
+function updateShield(deltaFactor) {
+  playerState.shield.update(deltaFactor);
+}
+//check if enemy projectiles hit player
+function checkEnemyProjectileCollisions() {
+  const nextProjectiles = [];
+  let playerRadius;
+  if (playerState.shield.isShieldVisible()) {
+    playerRadius = playerState.shield.getRadius();
+  } else {
+    playerRadius = playerState.radius;
+  }
+  enemyProjectiles.forEach((p) => {
+    if (!p.mesh) return; // skip invalid projectiles
+
+    const hit = checkCollision(p.mesh, playerMesh, p.radius, playerRadius);
+
+    if (hit) {
+      playerState.takeDamage(p.damage);
+      p.remove();
+    } else {
+      nextProjectiles.push(p);
+    }
+  });
+
+  enemyProjectiles.length = 0;
+  enemyProjectiles.push(...nextProjectiles);
+}
+
 function updateHouses(deltaFactor) {
   houses.forEach((h) => h.update(deltaFactor));
   houses.forEach((h) => {
@@ -791,14 +929,14 @@ function dropPresentIntoHouse(house, deltaFactor) {
   if (presentMesh) {
     // Clone the loaded scene object
     present = presentMesh.clone();
-    present.scale.set(0.5, 0.5, 0.5);
+    present.scale.set(0.67, 0.67, 0.67);
     present.position.copy(playerMesh.position);
     present.position.y -= 7; // start slightly below the sleigh
     present.traverse((child) => {
       if (child.isMesh) {
         // Ensure each clone has a unique material instance so they don't share color changes
         child.material = child.material.clone();
-        child.material.emissiveIntensity = 0.5;
+        //child.material.emissiveIntensity = 0.5;
       }
     });
   } else {
@@ -847,7 +985,7 @@ function dropPresentIntoHouse(house, deltaFactor) {
     present.position.x = baseX - scrollOffset + wobble;
 
     // vertical fall
-    present.position.y -= 5 * deltaFactor;
+    present.position.y -= 7 * deltaFactor;
 
     // landing
     if (present.position.y <= house.mesh.position.y + house.height / 2) {
@@ -870,9 +1008,6 @@ function dropPresentIntoHouse(house, deltaFactor) {
         scene.remove(present);
       }
 
-      //   scene.remove(present);
-      //   present.geometry.dispose();
-      //   present.material.dispose();
       deliveryPopups.push(
         new DeliveryPopup(
           house.mesh.position.x,

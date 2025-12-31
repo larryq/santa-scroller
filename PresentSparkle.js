@@ -12,8 +12,6 @@ export class PresentSparkle {
     // });
     const material = new THREE.MeshStandardMaterial({
       color: 0x000000, // Base color (keep it dark/black)
-      emissive: this.baseColor, // Your random Red or Green
-      emissiveIntensity: 1, // Boost the "glow" factor
       transparent: true,
       opacity: 0.9,
       blending: THREE.AdditiveBlending, // You can keep this for the "overlap" glow!
@@ -23,8 +21,8 @@ export class PresentSparkle {
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.position.set(x, y, z);
 
-    this.life = 1.5; // seconds
-    this.fadeSpeed = 1.5; // opacity fade per second
+    this.life = 1.0; // seconds
+    this.fadeSpeed = 1.0; // opacity fade per second
 
     // twinkle state
     this.twinkleTimer = Math.random() * Math.PI * 2;
@@ -42,23 +40,16 @@ export class PresentSparkle {
 
   update(delta) {
     this.life -= delta;
-    //this.mesh.material.opacity -= this.fadeSpeed * delta;
     // twinkle brightness
     this.twinkleTimer += this.twinkleSpeed * delta;
     const twinkle = (Math.sin(this.twinkleTimer) + 1) * 0.5; // 0–1
 
     this.mesh.material.opacity = Math.max(0, this.life) * (0.5 + twinkle * 0.5);
     // slight color shimmer
-    const r = 1.0;
-    const g = 1.0 - twinkle * this.colorShift;
-    const b = 1.0 - twinkle * this.colorShift;
+    const r = this.baseColor.r - twinkle * this.colorShift;
+    const g = this.baseColor.g - twinkle * this.colorShift;
+    const b = 0.0;
     this.mesh.material.color.setRGB(r, g, b);
-    this.mesh.material.color.setRGB(
-      this.baseColor.r,
-      this.baseColor.g,
-      this.baseColor.b
-    );
-    console.log(this.baseColor);
     // gentle drift
     this.mesh.position.x += (Math.random() - 0.5) * 0.1;
     this.mesh.position.y += (Math.random() - 0.5) * 0.1;

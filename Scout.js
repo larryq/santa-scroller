@@ -13,12 +13,15 @@ export class Scout extends Enemy {
     scene,
     playerMesh,
     playerState,
-    bursts
+    bursts,
+    BurstClass
   ) {
     // Smallest, fastest enemy, low HP
     super(2.5, 1, 50, 0x9999ff, SCOUT_SPEED, game, scene);
     this.originalColor = 0x9999ff;
     this.type = "SCOUT";
+    this.BurstClass = BurstClass;
+    this.bursts = bursts;
 
     if (this.mesh) {
       // Remove the placeholder geometry from the super() call
@@ -53,7 +56,7 @@ export class Scout extends Enemy {
       });
       this.mesh = new THREE.Mesh(geometry, material);
     }
-
+    this.mesh.scale.set(0.98, 0.98, 0.98);
     this.mesh.position.set(x, y, 0);
     scene.add(this.mesh);
   }
@@ -67,13 +70,24 @@ export class Scout extends Enemy {
     this.mesh.position.y +=
       Math.sin(this.mesh.position.x * 0.5) * 0.05 * deltaFactor * 60;
 
-    // Rotate the ship mesh
     this.mesh.rotation.y += 0.1 * deltaFactor * 60;
   }
 
   die() {
+    const explosion = new this.BurstClass(
+      this.mesh.position.x,
+      this.mesh.position.y,
+      this.mesh.position.z,
+      true, // the Cruiser was shot, not exploded
+      0x58a6ff,
+      this.scene
+    );
+    this.bursts.push(explosion);
     this.game.addScore(this.scoreValue, this.game.updateUI);
+    this.removeMesh();
+  }
 
+  removeMesh() {
     if (this.mesh) {
       // Safely dispose of resources within the GLTF model's hierarchy
       this.mesh.traverse((child) => {
@@ -94,4 +108,28 @@ export class Scout extends Enemy {
     }
     this.mesh = null;
   }
+
+  // die() {
+  //   this.game.addScore(this.scoreValue, this.game.updateUI);
+
+  //   if (this.mesh) {
+  //     // Safely dispose of resources within the GLTF model's hierarchy
+  //     this.mesh.traverse((child) => {
+  //       if (child.isMesh) {
+  //         if (child.geometry) child.geometry.dispose();
+
+  //         // Handle single or multi-material disposal
+  //         if (child.material) {
+  //           if (Array.isArray(child.material)) {
+  //             child.material.forEach((m) => m.dispose());
+  //           } else {
+  //             child.material.dispose();
+  //           }
+  //         }
+  //       }
+  //     });
+  //     this.scene.remove(this.mesh);
+  //   }
+  //   this.mesh = null;
+  // }
 }

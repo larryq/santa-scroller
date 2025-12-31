@@ -1,6 +1,9 @@
-import { CRUISER_SPEED } from "./constants.js";
+import { CRUISER_SPEED, ENEMY_PROJECTILE_SPEED } from "./constants.js";
 import { Enemy } from "./Enemy.js";
 import { Burst } from "./Burst.js";
+import { Projectile } from "./Projectile.js";
+
+const MIN_FIRE_DISTANCE = 8;
 
 export class Cruiser extends Enemy {
   constructor(
@@ -13,7 +16,8 @@ export class Cruiser extends Enemy {
     playerMesh,
     playerState,
     bursts,
-    cruiserMesh
+    cruiserMesh,
+    projectiles
   ) {
     super(
       4,
@@ -29,13 +33,18 @@ export class Cruiser extends Enemy {
     );
     this.originalColor = 0x44ffaa;
     this.type = "CRUISER";
-    this.detonateX = CRUISER_DETONATE_X;
+    //this.detonateX = CRUISER_DETONATE_X;
     this.BurstClass = BurstClass;
     this.game = game;
     this.playerMesh = playerMesh;
     this.playerState = playerState;
     this.bursts = bursts;
     this.scene = scene;
+    this.flashDistance = 15; // how close to player before flashing
+    this.isFlashing = false; // whether flashing has started
+    this.flashTimer = 0; // how long it has been flashing
+    this.flashDuration = 1.5; // seconds before explosion
+    this.projectiles = projectiles;
 
     if (this.mesh) {
       // Remove the placeholder geometry from the super() call
@@ -56,7 +65,7 @@ export class Cruiser extends Enemy {
           //child.material.emissive.setHex(this.originalColor);
         }
       });
-      this.mesh.scale.set(2.5, 2.5, 2.5);
+      this.mesh.scale.set(2.2, 2.2, 2.2);
     } else {
       // Fallback in case main.js failed to load the model
       const geometry = new THREE.BoxGeometry(
@@ -76,18 +85,62 @@ export class Cruiser extends Enemy {
     scene.add(this.mesh);
   }
 
+  //   update_old(deltaFactor) {
+  //     super.update(deltaFactor);
+  //     if (!this.mesh) return;
+
+  //     // Check for self-detonation point
+  //     if (this.mesh.position.x <= this.detonateX) {
+  //       this.explode();
+  //     }
+  //   }
+
   update(deltaFactor) {
     super.update(deltaFactor);
     if (!this.mesh) return;
 
-    // Check for self-detonation point
-    if (this.mesh.position.x <= this.detonateX) {
-      this.explode();
+    this.mesh.rotation.y += 0.05 * deltaFactor * 60;
+
+    const dx = this.mesh.position.x - this.playerMesh.position.x;
+    const dy = this.mesh.position.y - this.playerMesh.position.y;
+
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // // 1. Start flashing when close enough
+    // if (!this.isFlashing && distance <= this.flashDistance) {
+    //   this.isFlashing = true;
+    //   this.flashTimer = 0;
+    // }
+
+    // // 2. If flashing, animate and count down
+    // if (this.isFlashing) {
+    //   this.flashTimer += deltaFactor;
+
+    //   // Flash effect: toggle visibility or material color
+    //   const flash = Math.sin(this.flashTimer * 20) > 0;
+    //   this.mesh.visible = flash;
+
+    //   // After flashing long enough, explode
+    //   if (this.flashTimer >= this.flashDuration) {
+    //     this.mesh.visible = true; // ensure visible at explosion moment
+    //     this.explode();
+    //   }
+
+    //   return;
+    // }
+
+    // 3. Fire projectiles periodically when not flashing, and dont fire too close
+    if (
+      Math.random() < 0.44 * deltaFactor &&
+      !this.isFlashing &&
+      distance > MIN_FIRE_DISTANCE
+    ) {
+      this.fireProjectile(this.projectiles);
     }
   }
 
   explode() {
-    // Apply damage to player if close (requires playerState to be globally available)
+    // Apply damage to player if close
     if (
       this.playerMesh &&
       this.playerState &&
@@ -152,5 +205,32 @@ export class Cruiser extends Enemy {
       this.scene.remove(this.mesh);
     }
     this.mesh = null;
+  }
+
+  fireProjectile(projectiles) {
+    const dx = this.playerMesh.position.x - this.mesh.position.x;
+    const dy = this.playerMesh.position.y - this.mesh.position.y;
+
+    const angle = Math.atan2(dy, dx);
+
+    const speedX = Math.cos(angle) * ENEMY_PROJECTILE_SPEED;
+    const speedY = Math.sin(angle) * ENEMY_PROJECTILE_SPEED;
+
+    const projectile = new Projectile(
+      this.mesh.position.x,
+      this.mesh.position.y,
+      this.mesh.position.z,
+      this.scene,
+      this.christmasBallBaseMesh
+    );
+
+    // Override update to use enemy speed
+    projectile.update = function (deltaFactor) {
+      this.mesh.position.x += speedX * deltaFactor;
+      this.mesh.position.y += speedY * deltaFactor;
+      //this.mesh.rotation.y += 0.1 * deltaFactor * 60;
+    };
+
+    this.projectiles.push(projectile);
   }
 }

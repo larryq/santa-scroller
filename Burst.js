@@ -76,7 +76,6 @@ export class Burst {
       blending: THREE.AdditiveBlending, // Good for explosions
     });
 
-    // Use THREE.Points (particle system) instead of THREE.Mesh
     const points = new THREE.Points(geometry, material);
     points.position.set(x, y, z);
     this.scene.add(points);

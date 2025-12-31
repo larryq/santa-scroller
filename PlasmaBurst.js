@@ -10,7 +10,7 @@ import {
 import * as THREE from "three";
 
 export class PlasmaBurst {
-  constructor(x, y, z, color = 0x58a6ff, scene) {
+  constructor(x, y, z, color = 0xbd232fff, scene) {
     this.maxRadius = 15; // Max radius for collision detection
     this.currentRadius = 1; // Used for collision checking in main.js
     this.damage = 10;

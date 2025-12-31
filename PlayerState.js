@@ -6,7 +6,8 @@ export class PlayerState {
     playerMesh,
     playerState,
     scene,
-    game
+    game,
+    shield
   ) {
     this.hp = 10;
     this.fireCooldown = 0;
@@ -24,6 +25,7 @@ export class PlayerState {
     this.playerState = playerState;
     this.scene = scene;
     this.game = game;
+    this.shield = shield;
 
     // External function references
     this.updateUI = updateUI;
@@ -40,13 +42,12 @@ export class PlayerState {
       const absorbed = Math.min(damage, this.shieldHp);
       this.shieldHp -= absorbed;
       damageToPlayer -= absorbed;
+      console.log(
+        `Shield absorbed ${absorbed} damage, remaining shield HP: ${this.shieldHp}`
+      );
 
-      if (this.playerMesh) {
-        this.playerMesh.material.emissive.setHex(0xffff00);
-        setTimeout(() => {
-          if (this.playerMesh)
-            this.playerMesh.material.emissive.setHex(0x00ffff);
-        }, 100);
+      if (this.shieldHp <= 0 && this.shield) {
+        this.shield.show(false);
       }
     }
 
