@@ -252,7 +252,10 @@
       <h2 id="messageTitle">Game Over</h2>
       <p id="messageText">Your final score is: 0</p>
       <!-- Note: hideMessageBox and restartGame are exposed globally from main.js -->
-      <button class="btn" onclick="hideMessageBox(); restartGame();">
+      <button
+        class="btn"
+        onclick="hideMessageBox(); window.location.reload();;"
+      >
         Play Again
       </button>
     </div>

@@ -797,7 +797,7 @@ function updateArrays(deltaFactor) {
 
 function clearProjectilesFromScreen() {
   projectiles = projectiles.filter((p) => {
-    const shouldKeep = p.mesh && p.mesh.position.x < BOUNDARY_X + 5;
+    const shouldKeep = p.mesh && p.mesh.position.x < BOUNDARY_X + 35;
     if (!shouldKeep && p.mesh) p.remove();
     return shouldKeep;
   });
@@ -805,8 +805,8 @@ function clearProjectilesFromScreen() {
   const filtered = enemyProjectiles.filter((p) => {
     const shouldKeep =
       p.mesh &&
-      p.mesh.position.x > -BOUNDARY_X &&
-      p.mesh.position.x < BOUNDARY_X &&
+      p.mesh.position.x > -BOUNDARY_X - 10 &&
+      p.mesh.position.x < BOUNDARY_X + 10 &&
       p.mesh.position.y > -BOUNDARY_Y &&
       p.mesh.position.y < BOUNDARY_Y;
 
